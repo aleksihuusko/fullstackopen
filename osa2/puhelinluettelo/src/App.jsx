@@ -1,6 +1,6 @@
-import axios from 'axios';
 import { useEffect, useState } from 'react';
 
+import phoneService from './services/persons';
 import Filter from './components/Filter';
 import PersonForm from './components/PersonForm';
 import Persons from './components/Persons';
@@ -12,8 +12,8 @@ const App = () => {
   const [filter, setFilter] = useState('');
 
   useEffect(() => {
-    axios.get('http://localhost:3001/persons').then((response) => {
-      setPersons(response.data);
+    phoneService.getAll().then((response) => {
+      setPersons(response);
     });
   }, []);
 
@@ -32,19 +32,54 @@ const App = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const nameExists = persons.some((person) => person.name === newName);
-    const numberExists = persons.some((person) => person.number === newNumber);
-
-    if (nameExists || numberExists) {
-      alert(`${newName} with ${newNumber} is already added to phonebook`);
+    const person = persons.find((p) => p.name === newName);
+    if (person) {
+      const isConfirmed = window.confirm(
+        `${newName} is already added to phonebook, replace the old number ${person.number} with a new one ${newNumber}?`
+      );
+      if (isConfirmed) {
+        const updatedPerson = { ...person, number: newNumber };
+        phoneService
+          .update(person.id, updatedPerson)
+          .then((response) => {
+            setPersons(persons.map((p) => (p.id !== person.id ? p : response)));
+            setNewName('');
+            setNewNumber('');
+          })
+          .catch((error) => {
+            console.log(error.response.data);
+          });
+      }
     } else {
       const newPerson = {
         name: newName,
         number: newNumber
       };
-      setPersons(persons.concat(newPerson));
-      setNewName('');
-      setNewNumber('');
+      phoneService
+        .create(newPerson)
+        .then((response) => {
+          setPersons(persons.concat(response));
+          setNewName('');
+          setNewNumber('');
+        })
+        .catch((error) => {
+          console.log(error.response.data);
+        });
+    }
+  };
+
+  const handleDelete = (id, name) => {
+    if (window.confirm(`Delete ${name}?`)) {
+      phoneService
+        .remove(id)
+        .then(() => {
+          setPersons(persons.filter((person) => person.id !== id));
+        })
+        .catch((error) => {
+          alert(`The person '${name}' was already deleted from the server.`);
+          setPersons(persons.filter((person) => person.id !== id));
+          console.log(error.response.data);
+        });
     }
   };
 
@@ -67,7 +102,7 @@ const App = () => {
       />
 
       <h2>Numbers</h2>
-      <Persons filteredPersons={filteredPersons} />
+      <Persons handleDelete={handleDelete} filteredPersons={filteredPersons} />
     </div>
   );
 };
