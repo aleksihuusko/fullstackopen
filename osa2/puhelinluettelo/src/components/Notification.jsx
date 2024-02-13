@@ -4,15 +4,15 @@ const Notification = ({ message, type = 'success' }) => {
   const [visibleMessage, setVisibleMessage] = useState(message);
 
   useEffect(() => {
+    // This will now correctly handle both setting and clearing messages.
+    setVisibleMessage(message);
     if (message) {
-      setVisibleMessage(message);
       const timer = setTimeout(() => {
         setVisibleMessage(null);
       }, 5000);
-
       return () => clearTimeout(timer);
     }
-  }, [message]);
+  }, [message]); // Depend on message to trigger effect
 
   if (visibleMessage === null) {
     return null;
