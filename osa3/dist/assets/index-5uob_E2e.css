@@ -1,0 +1,1 @@
+.notification{position:fixed;bottom:20px;right:20px;padding:10px;border-radius:5px;box-shadow:0 2px 4px #0003;z-index:1000;display:inline-block;font-size:1em;text-align:center}.error{color:#fff;background-color:red;border:1px solid darkred}.success{color:#fff;background-color:green;border:1px solid darkgreen}
