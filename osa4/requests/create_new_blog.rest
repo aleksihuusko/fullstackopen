@@ -1,0 +1,9 @@
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+
+{
+    "title": "Get started with the MERN stack: Build a blog with MongoDB Atlas",
+    "author": "Samuele Zaza",
+    "url": "https://www.koyeb.com/tutorials/get-started-with-the-mern-stack-build-a-blog-with-mongodb-atlas",
+    "likes": 5
+}
