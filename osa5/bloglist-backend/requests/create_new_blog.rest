@@ -1,0 +1,10 @@
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+
+{
+    "title": "Exploring the Wonders of the JavaScript Ecosystem",
+    "author": "Aleksi Huusko",
+    "url": "https://example.com/exploring-javascript-ecosystem",
+    "likes": 42,
+    "userId": "669432f89a51bc079179a76c"
+}
