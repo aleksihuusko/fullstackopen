@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import blogService from "./services/blogs";
 import loginService from "./services/login";
@@ -6,6 +6,7 @@ import Blog from "./components/Blog";
 import LoginForm from "./components/LoginForm";
 import BlogForm from "./components/BlogForm";
 import Notification from "./components/Notification";
+import Togglable from "./components/Togglable";
 
 const App = () => {
   const [blogs, setBlogs] = useState([]);
@@ -13,6 +14,7 @@ const App = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [notification, setNotification] = useState({ message: null, type: "" });
+  const blogFormRef = useRef();
 
   useEffect(() => {
     const loggedUserJSON = window.localStorage.getItem("loggedBlogAppUser");
@@ -50,6 +52,7 @@ const App = () => {
     try {
       const returnedBlog = await blogService.create(blogObject);
       setBlogs(blogs.concat(returnedBlog));
+      blogFormRef.current.toggleVisibility();
       showNotification(
         `a new blog ${returnedBlog.title} by ${returnedBlog.author} added`,
         "success"
@@ -65,6 +68,8 @@ const App = () => {
       setNotification({ message: null, type: "" });
     }, 5000);
   };
+
+  const sortedBlogs = blogs.sort((a, b) => b.likes - a.likes);
 
   return (
     <div>
@@ -83,9 +88,17 @@ const App = () => {
           <p>
             {user.name} logged in <button onClick={handleLogout}>logout</button>
           </p>
-          <BlogForm createBlog={addBlog} />
-          {blogs.map((blog) => (
-            <Blog key={blog.id} blog={blog} />
+          <Togglable buttonLabel="new blog" ref={blogFormRef}>
+            <BlogForm createBlog={addBlog} />
+          </Togglable>
+          {sortedBlogs.map((blog) => (
+            <Blog
+              key={blog.id}
+              blog={blog}
+              blogs={blogs}
+              setBlogs={setBlogs}
+              user={user}
+            />
           ))}
         </div>
       )}
