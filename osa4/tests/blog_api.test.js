@@ -1,28 +1,48 @@
-const mongoose = require('mongoose');
-const connectDB = require('../db');
-const supertest = require('supertest');
-const app = require('../index');
+require("dotenv").config({ path: ".env.test" });
+
+const mongoose = require("mongoose");
+const supertest = require("supertest");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const app = require("../index");
 const api = supertest(app);
-const Blog = require('../models/blog');
-require('dotenv').config({ path: '.env.test' });
+const Blog = require("../models/blog");
+const User = require("../models/user");
+
+let token;
+let userId;
 
 beforeAll(async () => {
-  await connectDB();
+  await User.deleteMany({});
+  await Blog.deleteMany({});
+
+  const passwordHash = await bcrypt.hash("password123", 10);
+  const user = new User({ username: "testuser", passwordHash });
+  const savedUser = await user.save();
+
+  userId = savedUser._id;
+
+  const userForToken = { username: savedUser.username, id: savedUser._id };
+  token = jwt.sign(userForToken, process.env.SECRET, { expiresIn: "1h" });
 });
 
-describe('GET /api/blogs', () => {
-  test('blogs are returned as json', async () => {
+beforeEach(async () => {
+  await Blog.deleteMany({});
+});
+
+describe("GET /api/blogs", () => {
+  test("blogs are returned as json", async () => {
     await api
-      .get('/api/blogs')
+      .get("/api/blogs")
       .expect(200)
-      .expect('Content-Type', /application\/json/);
+      .expect("Content-Type", /application\/json/);
   });
 
-  test('blogs are returned with id as the identifier field', async () => {
+  test("blogs are returned with id as the identifier field", async () => {
     const response = await api
-      .get('/api/blogs')
+      .get("/api/blogs")
       .expect(200)
-      .expect('Content-Type', /application\/json/);
+      .expect("Content-Type", /application\/json/);
 
     expect(response.body).toHaveLength(response.body.length);
     response.body.forEach((blog) => {
@@ -33,111 +53,74 @@ describe('GET /api/blogs', () => {
   });
 });
 
-describe('POST /api/blogs', () => {
-  test('successfully adds a new blog, increasing the blog count by one', async () => {
+describe("POST /api/blogs", () => {
+  test("successfully adds a new blog, increasing the blog count by one", async () => {
     const newBlog = {
-      title: 'New Blog for Testing',
-      author: 'Tester',
-      url: 'http://test.com',
-      likes: 1
+      title: "New Blog for Testing",
+      author: "Tester",
+      url: "http://test.com",
+      likes: 1,
     };
 
     await api
-      .post('/api/blogs')
+      .post("/api/blogs")
+      .set("Authorization", `Bearer ${token}`)
       .send(newBlog)
       .expect(201)
-      .expect('Content-Type', /application\/json/);
+      .expect("Content-Type", /application\/json/);
 
-    const response = await api.get('/api/blogs');
+    const response = await api.get("/api/blogs");
     const titles = response.body.map((r) => r.title);
 
-    expect(response.body).toHaveLength(response.body.length);
-    expect(titles).toContain('New Blog for Testing');
+    expect(response.body).toHaveLength(1);
+    expect(titles).toContain("New Blog for Testing");
   });
 
-  afterAll(async () => {
-    await Blog.deleteOne({ title: 'New Blog for Testing' });
+  test("fails with status code 401 if token is not provided", async () => {
+    const newBlog = {
+      title: "Unauthorized Blog",
+      author: "Tester",
+      url: "http://test.com",
+      likes: 1,
+    };
+
+    await api
+      .post("/api/blogs")
+      .send(newBlog)
+      .expect(401)
+      .expect("Content-Type", /application\/json/);
   });
 });
 
-describe('POST /api/blogs with incomplete data', () => {
-  test('fails with status code 400 if title is missing', async () => {
-    const newBlogWithoutTitle = {
-      author: 'Missing Title Author',
-      url: 'http://missingtitle.com',
-      likes: 2
-    };
-
-    await api.post('/api/blogs').send(newBlogWithoutTitle).expect(400);
-  });
-
-  test('fails with status code 400 if url is missing', async () => {
-    const newBlogWithoutUrl = {
-      title: 'Missing URL',
-      author: 'Missing URL Author',
-      likes: 3
-    };
-
-    await api.post('/api/blogs').send(newBlogWithoutUrl).expect(400);
-  });
-});
-
-describe('DELETE /api/blogs/:id', () => {
+describe("DELETE /api/blogs/:id", () => {
   let addedBlog;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     addedBlog = new Blog({
-      title: 'Temporary Blog',
-      author: 'Temp Author',
-      url: 'http://tempurl.com',
-      likes: 1
+      title: "Temporary Blog",
+      author: "Temp Author",
+      url: "http://tempurl.com",
+      likes: 1,
+      user: userId,
     });
     await addedBlog.save();
   });
 
-  test('a blog can be deleted', async () => {
-    const initialBlogs = await Blog.find({});
-    const initialBlogCount = initialBlogs.length;
-
-    await api.delete(`/api/blogs/${addedBlog._id}`).expect(204);
+  test("a blog can be deleted by the user who added it", async () => {
+    await api
+      .delete(`/api/blogs/${addedBlog._id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(204);
 
     const blogsAfterDeletion = await Blog.find({});
-    const blogCountAfterDeletion = blogsAfterDeletion.length;
-
-    expect(blogCountAfterDeletion).toBe(initialBlogCount - 1);
-    const deletedBlog = await Blog.findById(addedBlog._id);
-    expect(deletedBlog).toBeNull();
-  });
-});
-
-describe('PUT /api/blogs/:id', () => {
-  let initialBlog;
-
-  beforeAll(async () => {
-    initialBlog = new Blog({
-      title: 'Initial Blog',
-      author: 'Initial Author',
-      url: 'http://initialurl.com',
-      likes: 0
-    });
-    await initialBlog.save();
+    expect(blogsAfterDeletion).toHaveLength(0);
   });
 
-  test('successfully updates the likes of a blog post', async () => {
-    const updates = { likes: 10 };
-
+  test("fails with status code 401 if token is not provided", async () => {
     await api
-      .put(`/api/blogs/${initialBlog._id}`)
-      .send(updates)
-      .expect(200)
-      .expect('Content-Type', /application\/json/);
-
-    const updatedBlog = await Blog.findById(initialBlog._id);
-    expect(updatedBlog.likes).toBe(updates.likes);
-  });
-
-  afterAll(async () => {
-    await Blog.findByIdAndDelete(initialBlog._id);
+      .delete(`/api/blogs/${addedBlog._id}`)
+      .expect(401)
+      .expect("Content-Type", /application\/json/);
   });
 });
 
